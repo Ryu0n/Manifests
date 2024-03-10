@@ -1,0 +1,12 @@
+services:
+  sample-runner:
+    image: sample-runner:latest
+    restart: always
+    build:
+      context: .
+    environment:
+      - REPO=Ryu0n/sample-repo
+      - TOKEN=${TOKEN}
+      - RUNNER_NAME=sample-runner
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
