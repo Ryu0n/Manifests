@@ -1,0 +1,29 @@
+annotations:
+  artifacthub.io/category: ai-machine-learning
+  artifacthub.io/changes: |
+    - kind: changed
+      description: GPU processes discovery to improve support for available container runtimes
+    - kind: added
+      description: Support for custom mounts to be injected by device plugin
+  artifacthub.io/signKey: |
+    fingerprint: 0356CCDB323AE5A7C2E06F7AF75EFA3A0D8EA822
+    url: https://www.maxiv.lu.se/pubkeys/oci-builder.asc
+  quay.expires-after: Never
+apiVersion: v2
+appVersion: 1.2.2
+description: Kubernetes device plugin implementing the sharing of Nvidia GPUs between
+  workloads
+icon: https://gitlab.com/uploads/-/system/project/avatar/51985578/mortalgpu.png
+keywords:
+- kubernetes
+- GPU
+maintainers:
+- email: andrii.salnikov@maxiv.lu.se
+  name: Andrii Salnikov
+- email: dmitrii.ermakon@maxiv.lu.se
+  name: Dmitrii Ermakov
+name: mortalgpu
+sources:
+- https://gitlab.com/MaxIV/kubernetes/mortalgpu
+type: application
+version: 1.2.2

@@ -1,0 +1,325 @@
+## Kafka configuration for asynchronous endpoint communication
+## /secure/async/<model-name> will be the endpoint for the model
+##
+kafka:
+  enabled: false
+
+  controller:
+    controllerOnly: true
+
+    pdb:
+      create: true
+      minAvailable: ""
+      maxUnavailable: 1
+    
+    persistence:
+      storageClass: "openebs-localpv"
+
+    logPersistence:
+      enabled: false
+      storageClass: "openebs-localpv"
+  
+  broker:
+    replicaCount: 3
+
+    resourcesPreset: "medium"
+
+    pdb:
+      create: true
+      minAvailable: ""
+      maxUnavailable: 1
+
+    persistence:
+      storageClass: "openebs-localpv"
+
+    logPersistence:
+      enabled: false
+      storageClass: "openebs-localpv"
+
+  metrics:
+    jmx:
+      enabled: true
+  
+  provisioning:
+    enabled: true
+    topics: 
+      - name: "inst-gen-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+      - name: "inst-theme-group-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+      - name: "vocal-gen-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+      - name: "vocal-theme-group-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+      - name: "modulation-gen-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+      - name: "sustain-gen-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+kafka-ui:
+  enabled: false
+
+  yamlApplicationConfig:
+    kafka:
+      clusters:
+        - name: kafka-cluster-staging
+          bootstrapServers: station-msa-api-staging-kafka-broker-headless.station-staging.svc.cluster.local:9092
+          properties:
+            security.protocol: PLAINTEXT
+
+## Redis configuration for caching completed samples
+## this will be used by the station service to return the generated samples
+##
+redis:
+  enabled: true
+
+  persistence:
+    storageClass: "openebs-localpv"
+    accessMode: "ReadWriteOnce"
+    size: "10Gi"
+
+  config:
+    maxmemory: "256mb"
+    maxmemoryPolicy: "allkeys-lru"
+    requirepass: "jlk3s14vn"
+
+  labels:
+    app: redis-staging
+  
+  service:
+    type: ClusterIP
+    port: 6379
+  
+  deployment:
+    replicas: 1
+    containerResources: {}
+
+
+## Common annotations to scrape metrics of pods
+##
+prometheus:
+  scrape: true
+  port: 8080
+  path: "/metrics"
+
+## Environment variables for the application
+## clusterPlatform: "eks" or "onpremise"
+## operation: "production" or "staging"
+##
+environments: 
+  clusterPlatform: "onpremise"
+  operation: "staging"
+  namespace: "station-staging"
+
+## Persistent volume claim for the application
+## The models will be shared between station and each model service
+##
+persistence:
+  accessMode: "ReadWriteOnce"
+  size: "25Gi"
+  storageClass: "openebs-localpv"
+
+station:
+  labels:
+    app: station-staging
+
+  deployment:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8080"
+      prometheus.io/path: "/metrics"
+    stationContainer:
+      image: <accound-id>.dkr.ecr.ap-northeast-2.amazonaws.com/station:<tag>
+    sidecarContainer:
+      image: <accound-id>.dkr.ecr.ap-northeast-2.amazonaws.com/ckpt_downloader:<tag>
+    replicas: 1
+
+  service:
+    type: NodePort
+    ports:
+      - port: 8080
+        targetPort: 8080
+        nodePort: 30200
+
+models:
+  instGen:
+    deployment:
+      deploymentName: inst-gen-staging-deployment
+      containerName: inst-gen-staging-container
+      labels:
+        app: inst-gen
+      annotations:
+        argocd.argoproj.io/sync-wave: "1"
+      replicas: 1
+      containerResources: {}
+      affinities: {}
+      tolerations: {}
+    service:
+      name: inst-gen-staging-svc
+      serviceType: ClusterIP
+      port: "8080"
+
+  instThemeGroup:
+    deployment:
+      deploymentName: inst-theme-group-staging-deployment
+      containerName: inst-theme-group-staging-container
+      labels:
+        app: inst-theme-group
+      annotations:
+        argocd.argoproj.io/sync-wave: "2"
+      replicas: 1
+      containerResources: {}
+      affinities: {}
+      tolerations: {}
+    service:
+      name: inst-theme-group-staging-svc
+      serviceType: ClusterIP
+      port: "8080"
+
+  lyricGen:
+    deployment:
+      deploymentName: lyric-gen-staging-deployment
+      containerName: lyric-gen-staging-container
+      labels:
+        app: lyric-gen
+      annotations:
+        argocd.argoproj.io/sync-wave: "3"
+      replicas: 1
+      containerResources: {}
+      affinities: {}
+      tolerations: {}
+    service:
+      name: lyric-gen-staging-svc
+      serviceType: ClusterIP
+      port: "8080"
+
+  modulationGen:
+    deployment:
+      deploymentName: modulation-gen-staging-deployment
+      containerName: modulation-gen-staging-container
+      labels:
+        app: modulation-gen
+      annotations:
+        argocd.argoproj.io/sync-wave: "4"
+      replicas: 1
+      containerResources: {}
+      affinities: {}
+      tolerations: {}
+    service:
+      name: modulation-gen-staging-svc
+      serviceType: ClusterIP
+      port: "8080"
+
+  referenceAnalyze:
+    deployment:
+      deploymentName: reference-analyze-staging-deployment
+      containerName: reference-analyze-staging-container
+      labels:
+        app: reference-analyze
+      annotations:
+        argocd.argoproj.io/sync-wave: "5"
+      replicas: 1
+      containerResources: {}
+      affinities: {}
+      tolerations: {}
+    service:
+      name: reference-analyze-staging-svc
+      serviceType: ClusterIP
+      port: "8080"
+
+  sustainGen:
+    deployment:
+      deploymentName: sustain-gen-staging-deployment
+      containerName: sustain-gen-staging-container
+      labels:
+        app: sustain-gen
+      annotations:
+        argocd.argoproj.io/sync-wave: "6"
+      replicas: 1
+      containerResources: {}
+      affinities: {}
+      tolerations: {}
+    service:
+      name: sustain-gen-staging-svc
+      serviceType: ClusterIP
+      port: "8080"
+
+  vocalGen:
+    deployment:
+      deploymentName: vocal-gen-staging-deployment
+      containerName: vocal-gen-staging-container
+      labels:
+        app: vocal-gen
+      annotations:
+        argocd.argoproj.io/sync-wave: "7"
+      replicas: 1
+      containerResources: {}
+      affinities: {}
+      tolerations: {}
+    service:
+      name: vocal-gen-staging-svc
+      serviceType: ClusterIP
+      port: "8080"
+
+  vocalThemeGroup:
+    deployment:
+      deploymentName: vocal-theme-group-staging-deployment
+      containerName: vocal-theme-group-staging-container
+      labels:
+        app: vocal-theme-group
+      annotations:
+        argocd.argoproj.io/sync-wave: "8"
+      replicas: 1
+      containerResources: {}
+      affinities: {}
+      tolerations: {}
+    service:
+      name: vocal-theme-group-staging-svc
+      serviceType: ClusterIP
+      port: "8080"
+
+  refToMeta:
+    deployment:
+      deploymentName: reference-to-meta-staging-deployment
+      containerName: reference-to-meta-staging-container
+      labels:
+        app: reference-to-meta
+      annotations:
+        argocd.argoproj.io/sync-wave: "9"
+      replicas: 0
+      containerResources: {}
+      affinities: {}
+      tolerations: {}
+    service:
+      name: reference-to-meta-staging-svc
+      serviceType: ClusterIP
+      port: "8080"

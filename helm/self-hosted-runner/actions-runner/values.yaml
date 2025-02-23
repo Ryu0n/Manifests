@@ -1,0 +1,31 @@
+runners:
+  runnerStation:
+    name: runner-station
+    repository: POZAlabs/station
+    repoName: station
+    labels:
+      - station
+  runnerStationModels:
+    name: runner-stationmodels
+    repository: POZAlabs/station-models
+    repoName: station-models
+    labels:
+      - station-models
+  runnerInfra:
+    name: runner-infra
+    repository: POZAlabs/infra
+    repoName: infra
+    labels:
+      - infra
+  runnerTerrapo:
+    name: runner-terrapo
+    repository: POZAlabs/terrapo
+    repoName: terrapo
+    labels:
+      - terrapo
+  runnerKubeCustomResources:
+    name: runner-kube-custom-resources
+    repository: POZAlabs/KubeCustomResources
+    repoName: KubeCustomResources
+    labels:
+      - kube-custom-resources

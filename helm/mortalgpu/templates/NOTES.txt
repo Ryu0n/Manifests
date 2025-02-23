@@ -1,0 +1,9 @@
+MortalGPU has been deployed.
+
+You can verify DaemonSet is up and running with:
+  kubectl get ds {{ include "mortalgpu.fullname" . }} --namespace {{ .Release.Namespace }}
+
+You are now ready to request GPUs specifying requests for the following resource names:
+{{- range .Values.config.deviceSharing }}
+  - {{ .resourceName }}
+{{- end }}

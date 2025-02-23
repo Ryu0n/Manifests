@@ -1,0 +1,489 @@
+## Kafka configuration for asynchronous endpoint communication
+## /secure/async/<model-name> will be the endpoint for the model
+##
+kafka:
+  enabled: true
+
+  controller:
+    controllerOnly: true
+    resourcesPreset: "small"
+
+    pdb:
+      create: true
+      minAvailable: ""
+      maxUnavailable: 1
+    
+    persistence:
+      storageClass: "openebs-localpv"
+
+    logPersistence:
+      enabled: false
+      storageClass: "openebs-localpv"
+  
+  broker:
+    replicaCount: 3
+    resourcesPreset: "medium"
+
+    pdb:
+      create: true
+      minAvailable: ""
+      maxUnavailable: 1
+
+    persistence:
+      storageClass: "openebs-localpv"
+
+    logPersistence:
+      enabled: false
+      storageClass: "openebs-localpv"
+
+  metrics:
+    jmx:
+      enabled: true
+      resourcesPreset: "micro"
+  
+  provisioning:
+    enabled: true
+    topics: 
+      - name: "inst-gen-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+      - name: "inst-theme-group-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+      - name: "vocal-gen-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+      - name: "vocal-theme-group-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+      - name: "modulation-gen-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+      - name: "sustain-gen-request"
+        partitions: 1
+        replicationFactor: 2
+        config:
+          max.message.bytes: 1048576
+          flush.messages: 1000
+
+kafka-ui:
+  enabled: true
+
+  yamlApplicationConfig:
+    kafka:
+      clusters:
+        - name: kafka-cluster
+          bootstrapServers: station-msa-api-kafka-broker-headless.station.svc.cluster.local:9092
+          properties:
+            security.protocol: PLAINTEXT
+
+## Redis configuration for caching completed samples
+## this will be used by the station service to return the generated samples
+##
+redis:
+  enabled: true
+
+  persistence:
+    storageClass: "openebs-localpv"
+    accessMode: "ReadWriteOnce"
+    size: "10Gi"
+
+  config:
+    maxmemory: "256mb"
+    maxmemoryPolicy: "allkeys-lru"
+    requirepass: "jlk3s14vn"
+
+  labels:
+    app: redis
+  
+  service:
+    type: ClusterIP
+    port: 6379
+  
+  deployment:
+    replicas: 1
+    containerResources: {}
+
+
+## Common annotations to scrape metrics of pods
+##
+prometheus:
+  scrape: "true"
+  port: "8080"
+  path: "/metrics"
+
+## Environment variables for the application
+## clusterPlatform: "eks" or "onpremise"
+## operation: "production" or "staging"
+##
+environments: 
+  clusterPlatform: "onpremise"
+  operation: "production"
+  namespace: "station"
+
+## Persistent volume claim for the application
+## The models will be shared between station and each model service
+##
+persistence:
+  accessMode: "ReadWriteOnce"
+  size: "25Gi"
+  storageClass: "openebs-localpv"
+
+station:
+  labels:
+    app: station
+
+  deployment:
+    annotations:
+      prometheus.io/scrape: "true"
+      prometheus.io/port: "8080"
+      prometheus.io/path: "/metrics"
+    stationContainer:
+      image: <accound-id>.dkr.ecr.ap-northeast-2.amazonaws.com/station:<tag>
+    sidecarContainer:
+      image: <accound-id>.dkr.ecr.ap-northeast-2.amazonaws.com/ckpt_downloader:<tag>
+    replicas: 1
+
+  service:
+    type: NodePort
+    ports:
+      - port: 8080
+        targetPort: 8080
+        nodePort: 30100
+
+models:
+  instGen:
+    deployment:
+      deploymentName: inst-gen-deployment
+      containerName: inst-gen-container
+      labels:
+        app: inst-gen
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        argocd.argoproj.io/sync-wave: "1"
+      replicas: 2
+      containerResources:
+        limits:
+          mortalgpu/l4: "10"
+      affinities: {}
+      tolerations: {}
+    service:
+      name: inst-gen-svc
+      serviceType: ClusterIP
+      port: 8080
+    scaledObject:
+      name: inst-gen-scaled-object
+      spec:
+        pollingInterval: 120
+        minReplicaCount: 2
+        maxReplicaCount: 8
+      triggers:
+        prometheus:
+          serverAddress: <prometheus-host>
+          query: sum(increase(ai_api_request_total{endpoint=~"/v.*inst-gen"}[2m]))
+          threshold: "15"
+        kafka:
+          bootstrapServers: station-msa-api-kafka.station.svc.cluster.local:9092
+          consumerGroup: inst-gen-request-group
+          topic: inst-gen-request
+          lagThreshold: "30"
+
+  instThemeGroup:
+    deployment:
+      deploymentName: inst-theme-group-deployment
+      containerName: inst-theme-group-container
+      labels:
+        app: inst-theme-group
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        argocd.argoproj.io/sync-wave: "2"
+      replicas: 2
+      containerResources:
+        limits:
+          mortalgpu/l4: "10"
+      affinities: {}
+      tolerations: {}
+    service:
+      name: inst-theme-group-svc
+      serviceType: ClusterIP
+      port: 8080
+    scaledObject:
+      name: inst-theme-group-scaled-object
+      spec:
+        pollingInterval: 120
+        minReplicaCount: 2
+        maxReplicaCount: 4
+      triggers:
+        prometheus:
+          serverAddress: <prometheus-host>
+          query: sum(increase(ai_api_request_total{endpoint=~"/v.*inst-theme-group"}[2m]))
+          threshold: "20"
+        kafka:
+          bootstrapServers: station-msa-api-kafka.station.svc.cluster.local:9092
+          consumerGroup: inst-theme-group-request-group
+          topic: inst-theme-group-request
+          lagThreshold: "30"
+
+  lyricGen:
+    deployment:
+      deploymentName: lyric-gen-deployment
+      containerName: lyric-gen-container
+      labels:
+        app: lyric-gen
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        argocd.argoproj.io/sync-wave: "3"
+      replicas: 1
+      containerResources:
+        limits:
+          mortalgpu/l4: "30"
+      affinities: {}
+      tolerations: {}
+    service:
+      name: lyric-gen-svc
+      serviceType: ClusterIP
+      port: 8080  
+    scaledObject:
+      name: lyric-gen-scaled-object
+      spec:
+        pollingInterval: 120
+        minReplicaCount: 1
+        maxReplicaCount: 4
+      triggers:
+        prometheus:
+          serverAddress: <prometheus-host>
+          query: sum(increase(ai_api_request_total{endpoint=~"/v.*lyric-gen"}[2m]))
+          threshold: "5"
+
+  modulationGen:
+    deployment:
+      deploymentName: modulation-gen-deployment
+      containerName: modulation-gen-container
+      labels:
+        app: modulation-gen
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        argocd.argoproj.io/sync-wave: "4"
+      replicas: 1
+      containerResources:
+        limits:
+          mortalgpu/l4: "10"
+      affinities: {}
+      tolerations: {}
+    service:
+      name: modulation-gen-svc
+      serviceType: ClusterIP
+      port: 8080
+    scaledObject:
+      name: modulation-gen-scaled-object
+      spec:
+        pollingInterval: 120
+        minReplicaCount: 1
+        maxReplicaCount: 4
+      triggers:
+        prometheus:
+          serverAddress: <prometheus-host>
+          query: sum(increase(ai_api_request_total{endpoint=~"/v.*modulation-gen"}[2m]))
+          threshold: "20"
+        kafka:
+          bootstrapServers: station-msa-api-kafka.station.svc.cluster.local:9092
+          consumerGroup: modulation-gen-request-group
+          topic: modulation-gen-request
+          lagThreshold: "30"
+
+  referenceAnalyze:
+    deployment:
+      deploymentName: reference-analyze-deployment
+      containerName: reference-analyze-container
+      labels:
+        app: reference-analyze
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        argocd.argoproj.io/sync-wave: "5"
+      replicas: 1
+      containerResources:
+        limits:
+          mortalgpu/l4: "20"
+      affinities: {}
+      tolerations: {}
+    service:
+      name: reference-analyze-svc
+      serviceType: ClusterIP
+      port: 8080
+    scaledObject:
+      name: reference-analyze-scaled-object
+      spec:
+        pollingInterval: 120
+        minReplicaCount: 1
+        maxReplicaCount: 4
+      triggers:
+        prometheus:
+          serverAddress: <prometheus-host>
+          query: sum(increase(ai_api_request_total{endpoint=~"/v.*reference-ai"}[2m]))
+          threshold: "5"
+
+  sustainGen:
+    deployment:
+      deploymentName: sustain-gen-deployment
+      containerName: sustain-gen-container
+      labels:
+        app: sustain-gen
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        argocd.argoproj.io/sync-wave: "6"
+      replicas: 1
+      containerResources:
+        limits:
+          mortalgpu/l4: "10"
+      affinities: {}
+      tolerations: {}
+    service:
+      name: sustain-gen-svc
+      serviceType: ClusterIP
+      port: 8080
+    scaledObject:
+      name: sustain-gen-scaled-object
+      spec:
+        pollingInterval: 120
+        minReplicaCount: 1
+        maxReplicaCount: 4
+      triggers:
+        prometheus:
+          serverAddress: <prometheus-host>
+          query: sum(increase(ai_api_request_total{endpoint=~"/v.*sustain-gen"}[2m]))
+          threshold: "15"
+        kafka:
+          bootstrapServers: station-msa-api-kafka.station.svc.cluster.local:9092
+          consumerGroup: sustain-gen-request-group
+          topic: sustain-gen-request
+          lagThreshold: "30"
+
+  vocalGen:
+    deployment:
+      deploymentName: vocal-gen-deployment
+      containerName: vocal-gen-container
+      labels:
+        app: vocal-gen
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        argocd.argoproj.io/sync-wave: "7"
+      replicas: 2
+      containerResources:
+        limits:
+          mortalgpu/l4: "10"
+      affinities: {}
+      tolerations: {}
+    service:
+      name: vocal-gen-svc
+      serviceType: ClusterIP
+      port: 8080
+    scaledObject:
+      name: vocal-gen-scaled-object
+      spec:
+        pollingInterval: 120
+        minReplicaCount: 2
+        maxReplicaCount: 6
+      triggers:
+        prometheus:
+          serverAddress: <prometheus-host>
+          query: sum(increase(ai_api_request_total{endpoint=~"/v.*vocal-gen"}[2m]))
+          threshold: "15"
+        kafka:
+          bootstrapServers: station-msa-api-kafka.station.svc.cluster.local:9092
+          consumerGroup: vocal-gen-request-group
+          topic: vocal-gen-request
+          lagThreshold: "30"
+
+  vocalThemeGroup:
+    deployment:
+      deploymentName: vocal-theme-group-deployment
+      containerName: vocal-theme-group-container
+      labels:
+        app: vocal-theme-group
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        argocd.argoproj.io/sync-wave: "8"
+      replicas: 1
+      containerResources:
+        limits:
+          mortalgpu/l4: "10"
+      affinities: {}
+      tolerations: {}
+    service:
+      name: vocal-theme-group-svc
+      serviceType: ClusterIP
+      port: 8080
+    scaledObject:
+      name: vocal-theme-group-scaled-object
+      spec:
+        pollingInterval: 120
+        minReplicaCount: 1
+        maxReplicaCount: 4
+      triggers:
+        prometheus:
+          serverAddress: <prometheus-host>
+          query: sum(increase(ai_api_request_total{endpoint=~"/v.*vocal-theme-group"}[2m]))
+          threshold: "20"
+        kafka:
+          bootstrapServers: station-msa-api-kafka.station.svc.cluster.local:9092
+          consumerGroup: vocal-theme-group-request-group
+          topic: vocal-theme-group-request
+          lagThreshold: "30"
+
+  refToMeta:
+    deployment:
+      deploymentName: reference-to-meta-deployment
+      containerName: reference-to-meta-container
+      labels:
+        app: reference-to-meta
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/metrics"
+        argocd.argoproj.io/sync-wave: "9"
+      replicas: 0
+      containerResources:
+        limits:
+          mortalgpu/l4: "50"
+      affinities: {}
+      tolerations: {}
+    service:
+      name: reference-to-meta-svc
+      serviceType: ClusterIP
+      port: 8080

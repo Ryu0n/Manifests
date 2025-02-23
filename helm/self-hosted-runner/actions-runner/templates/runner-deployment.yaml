@@ -1,0 +1,14 @@
+{{- range $key, $runner := .Values.runners }}
+apiVersion: actions.summerwind.dev/v1alpha1
+kind: RunnerDeployment
+metadata:
+  name: {{ $runner.name}}
+  namespace: actions
+spec:
+  template:
+    spec:
+      repository: {{ $runner.repository }}
+      group: k8s-group
+      labels: {{ $runner.labels | toYaml | nindent 8 }}
+---
+{{- end }}

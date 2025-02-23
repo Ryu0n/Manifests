@@ -1,0 +1,51 @@
+{{- if .Values.redis.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ printf "%s-deployment" .Values.redis.labels.app }}
+  namespace: {{ .Values.environments.namespace }}
+spec:
+  selector:
+    {{- with .Values.redis.labels }}
+    matchLabels:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  replicas: {{ .Values.redis.deployment.replicas }}
+  template:
+    metadata:
+      name: redis
+      {{- with .Values.redis.labels }}
+      labels:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      containers:
+        - name: redis
+          image: redis:6.2
+          command:
+            - redis-server
+            - "/redis-master/redis.conf"
+          env:
+            - name: MASTER
+              value: "true"
+          ports:
+            - containerPort: {{ .Values.redis.service.port }}
+          resources:
+            limits:
+              cpu: "0.1"
+          volumeMounts:
+            - mountPath: /redis-master-data
+              name: data
+            - mountPath: /redis-master
+              name: config
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-pvc" .Values.redis.labels.app }}
+        - name: config
+          configMap:
+            name: {{ printf "%s-config" .Values.redis.labels.app }}
+            items:
+              - key: redis-config
+                path: redis.conf
+{{- end }}

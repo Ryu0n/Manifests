@@ -1,0 +1,143 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ include "mortalgpu.fullname" . }}
+  labels:
+    {{- include "mortalgpu.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "mortalgpu.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print .Template.BasePath "/cm.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "mortalgpu.selectorLabels" . | nindent 8 }}
+    spec:
+      hostPID: true
+      hostNetwork: true
+      serviceAccountName: {{ include "mortalgpu.serviceAccountName" . }}
+      {{- if .Values.runtimeClassName }}
+      runtimeClassName: {{ .Values.runtimeClassName | quote }}
+      {{- end }}
+      containers:
+        - name: mortalgpu
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/sh
+            - -c
+            - |
+              {{- if .Values.config.mgctl.hostMount.enabled }}
+              cp -f {{ .Values.config.mgctl.sourcePath }} /var/lib/mortalgpu/mgctl
+              __TMP=$?
+              if ! test 0 -eq "$__TMP"; then
+                echo "Failure to copy mgctl to /var/lib/mortalgpu/mgctl";
+                exit $__TMP;
+              else
+                echo "Installed mgctl to /var/lib/mortalgpu/mgctl";
+              fi;
+              {{- end }}
+              /usr/bin/mgdp start -c /etc/mortalgpu --json-log={{ .Values.config.log.json }} --verbose={{ .Values.config.log.verbose }} --metrics-port={{ .Values.service.ports.mgdpMetrics }}
+          ports:
+            - containerPort: {{ .Values.service.ports.grpc }}
+              name: grpc
+            - containerPort: {{ .Values.service.ports.mgdpMetrics }}
+              name: mgdp-metrics
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: METAGPU_DEVICE_PLUGIN_NODENAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: MGDP_PORT
+              value: {{ required ".Values.service.ports.grpc must be set" .Values.service.ports.grpc | quote }}
+            - name: MG_CTL_TOKEN
+              value: {{ .Values.config.grpcSecurity.deviceToken | quote }}
+            - name: NVIDIA_DISABLE_REQUIRE
+              value: "true"
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: {{ .Values.config.visibleDevices | quote }}
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: utility
+            - name: NVIDIA_MIG_CONFIG_DEVICES
+              value: {{ .Values.config.migDevices | quote }}
+            - name: NVIDIA_MIG_MONITOR_DEVICES
+              value: {{ .Values.config.migDevices | quote }}
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          volumeMounts:
+            - name: device-plugin
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: pod-resources
+              mountPath: /var/lib/kubelet/pod-resources
+            - name: config
+              mountPath: /etc/mortalgpu
+            - name: proc
+              mountPath: /host/proc
+              mountPropagation: HostToContainer
+              readOnly: true
+            {{- if .Values.config.mgctl.hostMount.enabled }}
+            - name: mgctl
+              mountPath: /var/lib/mortalgpu
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+        {{- if .Values.exporter.enabled }}
+        - name: metagpu-exporter
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /usr/bin/mgex
+            - start
+            - -t
+            - {{ .Values.config.grpcSecurity.deviceToken | quote }}
+            - '--json-log={{ .Values.config.log.json }}'
+            - '--verbose={{ .Values.config.log.verbose }}'
+            - '--metrics-addr=0.0.0.0:{{ .Values.service.ports.exporter }}'
+            - '--mgsrv=127.0.0.1:{{ required ".Values.service.ports.grpc must be set" .Values.service.ports.grpc }}'
+          ports:
+            - name: metrics
+              containerPort: {{ .Values.service.ports.exporter }}
+          resources:
+            {{- toYaml .Values.exporter.resources | nindent 12 }}
+        {{- end }}
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: pod-resources
+          hostPath:
+            path: /var/lib/kubelet/pod-resources
+        - name: config
+          configMap:
+            name: {{ include "mortalgpu.fullname" . }}-config
+        - name: proc
+          hostPath:
+            path: /proc
+        {{- if .Values.config.mgctl.hostMount.enabled }}
+        - name: mgctl
+          hostPath:
+            path: {{ .Values.config.mgctl.hostMount.hostPath }}
+            type: DirectoryOrCreate
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      

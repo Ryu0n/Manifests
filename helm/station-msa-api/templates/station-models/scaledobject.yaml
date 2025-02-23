@@ -1,0 +1,34 @@
+{{- range $key, $model := .Values.models }}
+{{- if $model.scaledObject }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ $model.scaledObject.name }}
+  namespace: {{ $.Values.environments.namespace }}
+  annotations:
+    scaledobject.keda.sh/transfer-hpa-ownership: "true"
+    validations.keda.sh/hpa-ownership: "true"
+    autoscaling.keda.sh/paused: "false"
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ $model.deployment.deploymentName }}
+  pollingInterval: {{ $model.scaledObject.spec.pollingInterval }}
+  minReplicaCount: {{ $model.scaledObject.spec.minReplicaCount }}
+  maxReplicaCount: {{ $model.scaledObject.spec.maxReplicaCount }}
+  triggers:
+  {{-  with $model.scaledObject.triggers.prometheus }}
+  - type: prometheus
+    metadata:
+      {{- toYaml . | nindent 6 }}
+  {{- end }}
+  {{-  with $model.scaledObject.triggers.kafka }}
+  - type: kafka
+    metadata:
+      {{-  toYaml . | nindent 6 }}
+  {{- end }}
+      
+---
+{{- end }}
+{{- end }}

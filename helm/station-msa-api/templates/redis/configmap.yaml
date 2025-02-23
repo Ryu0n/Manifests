@@ -1,0 +1,12 @@
+{{- if .Values.redis.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-config" .Values.redis.labels.app }}
+  namespace: {{ .Values.environments.namespace }}
+data:
+  redis-config: |
+    maxmemory {{ .Values.redis.config.maxmemory }}
+    maxmemory-policy {{ .Values.redis.config.maxmemoryPolicy }}
+    requirepass {{ .Values.redis.config.requirepass }}
+{{- end }}

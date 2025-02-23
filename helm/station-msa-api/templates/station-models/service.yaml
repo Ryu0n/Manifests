@@ -1,0 +1,22 @@
+{{- range $key, $model := .Values.models }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $model.service.name }}
+  namespace: {{ $.Values.environments.namespace }}
+  {{- with $model.service.labels }}
+  labels:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ $model.service.serviceType }}
+  {{- with $model.deployment.labels }}
+  selector:
+    env: {{ $.Values.environments.operation }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  ports:
+    - port: {{ $model.service.port }}
+      targetPort: {{ $model.service.port }}
+---
+{{- end }}

@@ -1,0 +1,35 @@
+{{- if .Values.scc }}
+kind: SecurityContextConstraints
+apiVersion: security.openshift.io/v1
+metadata:
+  name: {{ include "mortalgpu.fullname" . }}
+  labels:
+    {{- include "mortalgpu.labels" . | nindent 4 }}
+allowHostDirVolumePlugin: true
+allowHostIPC: true
+allowHostNetwork: true
+allowHostPID: true
+allowHostPorts: true
+allowPrivilegeEscalation: true
+allowPrivilegedContainer: true
+readOnlyRootFilesystem: false
+requiredDropCapabilities: null
+allowedCapabilities:
+- '*'
+allowedUnsafeSysctls:
+- '*'
+fsGroup:
+  type: RunAsAny
+runAsUser:
+  type: RunAsAny
+seLinuxContext:
+  type: RunAsAny
+seccompProfiles:
+- '*'
+supplementalGroups:
+  type: RunAsAny
+users:
+- system:serviceaccount:{{ .Release.Namespace }}:{{ include "mortalgpu.serviceAccountName" . }}
+volumes:
+- '*'
+{{- end }}

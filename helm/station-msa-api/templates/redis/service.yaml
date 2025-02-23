@@ -1,0 +1,16 @@
+{{- if .Values.redis.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ printf "%s-svc" .Values.redis.labels.app }}
+  namespace: {{ .Values.environments.namespace }}
+spec:
+  type: {{ .Values.redis.service.type }}
+  ports:
+    - port: {{ .Values.redis.service.port }}
+      targetPort: {{ .Values.redis.service.port }}
+  {{- with .Values.redis.labels }}
+  selector:
+    {{- toYaml . | nindent 4 }} 
+  {{- end }}
+{{- end }}

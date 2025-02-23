@@ -1,0 +1,93 @@
+{{- range $key, $model := .Values.models }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $model.deployment.deploymentName }}
+  namespace: {{ $.Values.environments.namespace }}
+  {{- with $model.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    {{- with $model.deployment.labels }}
+    matchLabels:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  replicas: {{ $model.deployment.replicas }}
+  template:
+    metadata:
+      {{- with $model.deployment.labels }}
+      labels:
+        env: {{ $.Values.environments.operation }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      annotations:
+        {{- include "station-msa-api.prometheus.annotations" $ | nindent 8 }}
+    spec:
+      {{- if eq "onpremise" $.Values.environments.clusterPlatform }}
+      imagePullSecrets:
+        - name: regcd
+      {{- end }}
+      volumes:
+        - name: app-code
+          emptyDir: {}
+        - name: ckpt-volume
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-%s" $.Values.environments.clusterPlatform $.Values.environments.operation }}
+      initContainers:
+        - name: {{ $model.deployment.containerName }}
+          image: {{ (include "readImageFile" (dict "deploymentName" (printf "container-%s" $model.deployment.labels.app) "Files" $.Files)) }}
+          command: ["sh", "-c"]
+          args:
+            - |
+              cp -a /app/. /app-code/
+          volumeMounts:
+            - name: app-code
+              mountPath: /app-code
+      containers:
+        - name: torch-cuda
+          image: {{ (include "readImageFile" (dict "deploymentName" (printf "env-%s" $model.deployment.labels.app) "Files" $.Files)) }}
+          imagePullPolicy: IfNotPresent
+          env:
+            {{- if eq "staging" $.Values.environments.operation }}
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: ""
+            {{- end }}
+            - name: OPERATION_ENVIRONMENT
+              value: {{ $.Values.environments.operation }}
+          {{- with $model.deployment.containerResources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          ports:
+            - containerPort: {{ $model.service.port }}
+          startupProbe:
+            exec:
+              command:
+              - cat
+              - /tmp/started
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 185
+          command: ["sh", "-c"]
+          args:
+            - |
+              cd /app-code
+              chmod +x /app-code/gunicorn_settings.sh
+              /app-code/gunicorn_settings.sh
+          volumeMounts:
+            - name: app-code
+              mountPath: /app-code
+            - name: ckpt-volume
+              mountPath: /mnt/station_checkpoints
+      {{- with $model.deployment.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $model.deployment.affinities }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+{{- end }}

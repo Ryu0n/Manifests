@@ -1,0 +1,269 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+        "config": {
+            "properties": {
+                "allocator": {
+                    "properties": {
+                        "allowCollocation": {
+                            "type": "boolean"
+                        },
+                        "externalConfig": {
+                            "properties": {
+                                "args": {
+                                    "type": "array"
+                                },
+                                "envVars": {
+                                    "type": "array"
+                                },
+                                "path": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "noSplit": {
+                            "type": "boolean"
+                        },
+                        "plugin": {
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
+                "deviceManager": {
+                    "properties": {
+                        "deviceCacheTTL": {
+                            "type": "integer"
+                        },
+                        "processesDiscoveryPeriod": {
+                            "type": "integer"
+                        }
+                    },
+                    "type": "object"
+                },
+                "deviceSharing": {
+                    "items": {
+                        "properties": {
+                            "metagpusPerGpu": {
+                                "type": "integer"
+                            },
+                            "metagpusPerGpuMemoryChunkMB": {
+                                "type": "integer"
+                            },
+                            "migid": {
+                                "type": "array"
+                            },
+                            "modelName": {
+                                "type": "array"
+                            },
+                            "reservedChunks": {
+                                "type": "integer"
+                            },
+                            "resourceName": {
+                                "type": "string"
+                            },
+                            "uuid": {
+                                "type": "array"
+                            }
+                        },
+                        "required": [
+                            "resourceName"
+                        ],
+                        "type": "object"
+                    },
+                    "minItems": 1,
+                    "type": "array"
+                },
+                "deviceSpecs": {
+                    "type": "boolean"
+                },
+                "grpcSecurity": {
+                    "properties": {
+                        "containerToken": {
+                            "type": "string"
+                        },
+                        "deviceToken": {
+                            "type": "string"
+                        },
+                        "jwtSecret": {
+                            "type": "string"
+                        }
+                    },
+                    "required": [
+                        "deviceToken",
+                        "containerToken",
+                        "jwtSecret"
+                    ],
+                    "type": "object"
+                },
+                "log": {
+                    "properties": {
+                        "json": {
+                            "type": "boolean"
+                        },
+                        "verbose": {
+                            "type": "boolean"
+                        }
+                    },
+                    "type": "object"
+                },
+                "memoryEnforcer": {
+                    "type": "boolean"
+                },
+                "mgctl": {
+                    "properties": {
+                        "hostMount": {
+                            "properties": {
+                                "containerPath": {
+                                    "type": "string"
+                                },
+                                "enabled": {
+                                    "type": "boolean"
+                                },
+                                "hostPath": {
+                                    "type": "string"
+                                }
+                            },
+                            "type": "object"
+                        },
+                        "sourcePath": {
+                            "type": "string"
+                        }
+                    },
+                    "type": "object"
+                },
+                "migDevices": {
+                    "type": "string"
+                },
+                "pluginMounts": {
+                    "type": "array"
+                },
+                "visibleDevices": {
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "exporter": {
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "resources": {
+                    "properties": {},
+                    "type": "object"
+                },
+                "serviceMonitor": {
+                    "properties": {
+                        "enabled": {
+                            "type": "boolean"
+                        },
+                        "interval": {
+                            "type": "string"
+                        },
+                        "labels": {
+                            "properties": {},
+                            "type": "object"
+                        }
+                    },
+                    "type": "object"
+                }
+            },
+            "type": "object"
+        },
+        "extraEnv": {
+            "type": "array"
+        },
+        "fullnameOverride": {
+            "type": "string"
+        },
+        "image": {
+            "properties": {
+                "pullPolicy": {
+                    "type": "string"
+                },
+                "repository": {
+                    "type": "string"
+                },
+                "tag": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "repository"
+            ],
+            "type": "object"
+        },
+        "imagePullSecrets": {
+            "type": "array"
+        },
+        "nameOverride": {
+            "type": "string"
+        },
+        "nodeSelector": {
+            "properties": {},
+            "type": "object"
+        },
+        "podAnnotations": {
+            "properties": {},
+            "type": "object"
+        },
+        "resources": {
+            "properties": {},
+            "type": "object"
+        },
+        "runtimeClassName": {
+            "type": "string"
+        },
+        "scc": {
+            "type": "boolean"
+        },
+        "securityContext": {
+            "properties": {
+                "privileged": {
+                    "type": "boolean"
+                }
+            },
+            "type": "object"
+        },
+        "service": {
+            "properties": {
+                "ports": {
+                    "properties": {
+                        "exporter": {
+                            "type": "integer"
+                        },
+                        "grpc": {
+                            "type": "integer"
+                        },
+                        "mgdpMetrics": {
+                            "type": "integer"
+                        }
+                    },
+                    "type": "object"
+                },
+                "type": {
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "serviceAccount": {
+            "properties": {
+                "annotations": {
+                    "properties": {},
+                    "type": "object"
+                },
+                "name": {
+                    "type": "string"
+                }
+            },
+            "type": "object"
+        },
+        "tolerations": {
+            "type": "array"
+        }
+    },
+    "type": "object"
+}

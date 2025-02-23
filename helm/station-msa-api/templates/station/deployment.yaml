@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ printf "%s-deployment" .Values.station.labels.app }}
+  namespace: {{ .Values.environments.namespace }}
+  {{- with .Values.station.deployment.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ .Values.station.deployment.replicas }}
+  selector:
+    {{- with .Values.station.labels }}
+    matchLabels:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  template:
+    metadata:
+      {{- with .Values.station.labels }}
+      labels:
+        env: {{ $.Values.environments.operation }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      annotations:
+        {{- include "station-msa-api.prometheus.annotations" . | nindent 8 }}
+    spec:
+      {{- if eq "onpremise" .Values.environments.clusterPlatform }}
+      imagePullSecrets:
+        - name: regcd
+      {{- end }}
+      containers:
+        - name: station-container
+          image: {{ .Values.station.deployment.stationContainer.image }}
+          env:
+          - name: OPERATION_ENVIRONMENT
+            value: {{ .Values.environments.operation }}
+          ports:
+            - containerPort: {{ index .Values.station.service.ports 0 "targetPort" }}
+          volumeMounts:
+          - mountPath: /mnt/station_checkpoints
+            name: ckpt-volume
+        - name: sidecar-container
+          image: {{ .Values.station.deployment.sidecarContainer.image}}
+          volumeMounts:
+          - mountPath: /mnt/station_checkpoints
+            name: ckpt-volume
+      volumes:
+        - name: ckpt-volume
+          persistentVolumeClaim:
+            claimName: {{ printf "%s-%s" .Values.environments.clusterPlatform .Values.environments.operation }}

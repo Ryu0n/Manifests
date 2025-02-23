@@ -1,0 +1,204 @@
+config:
+  # -- Set the [NVIDIA_VISIBLE_DEVICES](https://github.com/NVIDIA/nvidia-container-toolkit/tree/main/cmd/nvidia-container-runtime#nvidia_visible_devices)
+  # for MortalGPU Pods (affects GPU discovery)
+  visibleDevices: all
+  # -- Set the [NVIDIA_MIG_CONFIG_DEVICES](https://github.com/NVIDIA/nvidia-container-toolkit/tree/main/cmd/nvidia-container-runtime#nvidia_mig_config_devices)
+  # and [NVIDIA_MIG_MONITOR_DEVICES](https://github.com/NVIDIA/nvidia-container-toolkit/tree/main/cmd/nvidia-container-runtime#nvidia_mig_monitor_devices)
+  # for MortalGPU Pods (affects GPU discovery)
+  migDevices: all
+  # Configure logging
+  log:
+    # -- Log verbosity
+    verbose: false
+    # -- Log in JSON format
+    json: true
+  # Define MortalGPU resources
+  deviceSharing: # @schema minItems:1
+    - # -- Name of the Kubernetes resource
+      resourceName: mortalgpu/v100 # @schema required:true
+      # -- Number of metaGPUs per each matching physical device.
+      # It is recommended to set it based on GPU memory.
+      metagpusPerGpu: 320
+      # -- GPU memory chunk size to
+      # split the GPU to meta GPUs.
+      # Ignored if metagpusPerGpu is set
+      metagpusPerGpuMemoryChunkMB: 0
+      # -- Number of metaGPUs which will not be allocated,
+      # by MortalGPU, so that they can be used by other workloads
+      # or other MortalGPU instances.
+      # Please pay attention that if the number of the reservedChunks
+      # is larger than the number of total chunks, then MortalGPU fails to start
+      # and goes to CrashLoopBackOff.
+      reservedChunks: 0
+      # -- Filter mathing GPU devices by UUIDs.
+      # Empty list implies no filtering.
+      uuid: []
+      # -- Filter matching GPU device names
+      # as in `nvidia-smi -L`.
+      # Empty list implies no filtering.
+      modelName: []
+      # -- Further filter MIG partitions on mathing GPU devices by MIG Instance IDs.
+      # Empty list implies no filtering on MIG basis.
+      migid: []
+  # MortalGPU allocator plugin configuration
+  allocator:
+    # -- Name of the used plugin, one of "collocate", "spread", "external".
+    plugin: "collocate"
+    # -- Flag. If enabled allows scheduling multiple GPU containers on the
+    # same physical GPU for plugins which support it (spread, external).
+    allowCollocation: true
+    # -- Flag. If set, then MortalGPU will fail to start a Pod
+    # if it is impossible to allocate its request using one physical GPU.
+    noSplit: true
+    # External allocator configuration
+    externalConfig:
+      # -- Path to an executable
+      path: ""
+      # -- Command line arguments to be passed to the executable
+      args: []
+      # -- Environment variables to be added to the default system environment.
+      envVars:
+        []
+        # - name: env_var_1
+        #   value: env_value_1
+  # -- Enforce process GPU memory usage by means of killing the process going over `resource.limits`.
+  memoryEnforcer: true
+  # -- Enable passing the mounted devices specs in DevicePlugin allocation response.
+  # Enable if you are using CPUManager to allow DevicePlugin to interoperate with it.
+  deviceSpecs: false
+  # mgctl tool injection
+  mgctl:
+    # -- `mgctl` location inside MortalGPU container image
+    sourcePath: /usr/bin/mgctl
+    # mount mgctl binary from hostPath to containerPath of user continer using DevicePlugin API
+    hostMount:
+      # -- Enable mounting of `mgctl` binary to resource requesting container (from hostPath via DevicePlugin API)
+      enabled: true
+      # -- Hostpath to use for `mgctl` binary location.
+      # If you are running multiple MortalGPU installations on the same host, make sure `hostPath` is unique.
+      hostPath: /var/lib/mortalgpu/
+      # -- Path inside resource requesting container to mount `mgctl`
+      containerPath: /usr/bin/
+  # -- Extra device-plugin level mounts for contaienrs requesting MortalGPU resources.
+  # Can be usefull to inject centrally managed custom wrappers around mgctl.
+  pluginMounts: []
+    # - hostPath: /opt/my-custom-mgctl-wrapper
+    #   mountPath: /usr/bin/mgwrap
+
+  # Configure gRPC JWT security with priviledge level separation
+  grpcSecurity:
+    # -- Token with priviledge level 0 - access to device functions (e.g. for metrics extraction).
+    # You can find bash script example to generate tokens in assets/genjwt.sh.
+    # @default -- change chart default in prodcution
+    deviceToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im1ldGFncHVAaW5zdGFuY2UiLCJ2aXNpYmlsaXR5TGV2ZWwiOiJsMCJ9.2rHykHFcHoIr-OCoPA5Am4ubf31-RJcayZnOTK6db94 # @schema required:true
+    # -- Token with priviledge level 1 - access to processes (e.g. from running GPU-enabled container)
+    # You can find bash script example to generate tokens in assets/genjwt.sh
+    # @default -- change chart default in prodcution
+    containerToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6Im1ldGFncHVAaW5zdGFuY2UiLCJ2aXNpYmlsaXR5TGV2ZWwiOiJsMSJ9.o5v6Zdi1FKXQevRjuSbABBX1vIRYgN3Daz9iXabuFFA # @schema required:true
+    # -- JWT signing key for priviledge level separation security
+    # @default -- change chart default in prodcution
+    jwtSecret: topSecret # @schema required:true
+
+  # Device manager fine tuning
+  deviceManager:
+    # -- Processes scanning loop frequency
+    processesDiscoveryPeriod: 5
+    # -- GPU devices cache validity
+    deviceCacheTTL: 3600
+
+image:
+  repository: quay.io/maxiv/mortalgpu # @schema required:true
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart version.
+  tag: ""
+imagePullSecrets: []
+
+# If you are running the single instance and want pretty short
+# name of deamonset use fullnameOverride: mortalgpu
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+securityContext:
+  # -- Device plugin needs priviledged container
+  privileged: true
+
+# -- Create SecurityContextConstraints resource (for running on OpenShift/OKD)
+scc: false
+
+service:
+  type: ClusterIP
+  # Device plugin requires hostNetwork to function
+  # If you are running multiple MortalGPU installations on the same host, make sure ports are unique.
+  ports:
+    # -- MortalGPU gRPC port
+    grpc: 50052
+    # -- Listening port for MortalGPU device plugins resource usage metrics (prometheus exporter)
+    mgdpMetrics: 2112
+    # -- Listening port for container-aware GPUs usage metrics (prometheus exporter)
+    exporter: 2113
+
+# -- Define runtimeClassName. You need to define this only if "nvidia" is not a default runtime.
+# Note, if this is a case for Kuberentes cluster, than in addition to specifying MortalGPU external resources
+# you need to specify the runtimeClassName in wokrload Pods as well.
+runtimeClassName: ""
+
+# Resources for mortalgpu
+resources:
+  {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 512Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 256Mi
+
+# Use use nodeSelector to schedule only on subset of nodes
+# You have to Label GPU-enabled nodes with e.g.:
+#   kubectl label node gpu-worker-0 "accelerator=nvidia"
+nodeSelector:
+  {}
+  # accelerator: nvidia
+
+# Toleration to schedule on nodes with taints
+tolerations:
+  []
+  #- key: CriticalAddonsOnly
+  #  operator: Exists
+  #- key: nvidia.com/gpu
+  #  operator: Exists
+  #  effect: NoSchedule
+
+# Extra environment variable for mortalgpu container
+extraEnv: []
+
+# Prometheus exported to run alongside mortalgpu
+exporter:
+  # -- Enable MortalGPU Prometheus exporter
+  enabled: true
+  serviceMonitor:
+    # -- Create service monitor
+    enabled: true
+    interval: "15s"
+    labels: {}
+  # Resources for mortalgpu-exporter
+  resources:
+    {}
+    # limits:
+    #   cpu: 50m
+    #   memory: 128Mi
+    # requests:
+    #   cpu: 10m
+    #   memory: 64Mi
